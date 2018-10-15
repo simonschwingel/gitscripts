@@ -34,14 +34,6 @@ Function Login
         Write-Host "You need to login to Azure"
         Login-AzureRmAccount
     }
-
-    try {
-        $tenant = Get-AzureADTenantDetail
-    } catch [Microsoft.Open.Azure.AD.CommonLibrary.AadNeedAuthenticationException] {
-        Write-Host "You're not conncted to Azure AD."
-        $d = Connect-AzureAD 
-        #$tenant = Get-AzureADTenantDetail
-    }
 }
 
 #checking if you are on Azure Shell
@@ -69,7 +61,10 @@ $items = @()
 foreach ($sub in $subs)
 {
     Set-AzureRmContext -SubscriptionObject $sub
-    $tenant = Get-AzureADTenantDetail
+    if ($null -eq $tenant -or $tenant.ObjectId -ne $sub.TenantId) {
+        Connect-AzureAD -TenantId $sub.TenantId
+        $tenant = Get-AzureADTenantDetail
+    }
     $account = Get-AzureRmRoleAssignment -IncludeClassicAdministrators | Where-Object RoleDefinitionName -eq 'ServiceAdministrator;AccountAdministrator'
     try {
         $user = Get-AzureADUser -ObjectId $account.SignInName
@@ -80,7 +75,7 @@ foreach ($sub in $subs)
 
     $item = New-Object -TypeName psobject 
     $item | Add-Member -MemberType NoteProperty -Name TenantId -Value $sub.TenantId
-    $item | Add-Member -MemberType NoteProperty -Name TenantDomain -Value $tenant.VerifiedDomains.Name
+    $item | Add-Member -MemberType NoteProperty -Name TenantName -Value $tenant.DisplayName
     $item | Add-Member -MemberType NoteProperty -Name SubscriptionId -Value $sub.Id
     $item | Add-Member -MemberType NoteProperty -Name SubscriptionName -Value $sub.Name   
     $item | Add-Member -MemberType NoteProperty -Name Account -Value $account.SignInName
