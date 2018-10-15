@@ -34,6 +34,14 @@ Function Login
         Write-Host "You need to login to Azure"
         Login-AzureRmAccount
     }
+
+    try {
+        $tenant = Get-AzureADTenantDetail
+    } catch [Microsoft.Open.Azure.AD.CommonLibrary.AadNeedAuthenticationException] {
+        Write-Host "You're not conncted to Azure AD."
+        $d = Connect-AzureAD 
+        #$tenant = Get-AzureADTenantDetail
+    }
 }
 
 #checking if you are on Azure Shell
@@ -47,6 +55,10 @@ else {
     Import-Module AzureRm.Resources -ErrorAction SilentlyContinue | Out-Null 
     If ( !(Get-Module | where-Object {$_.Name -like "AzureRM.Resources"}).Count ) { Install-Module AzureRM -scope CurrentUser}
 
+    # check for and install the AzureAD if needed
+    Import-Module AzureAD -ErrorAction SilentlyContinue |Out-Null
+    if ( !(Get-Module | where-Object {$_.Name -like "AzureAD"}).Count ) { Install-Module AzureAD -scope CurrentUser }
+
     # Loggin in to Azure (if needed)
     Login
 }
@@ -57,12 +69,23 @@ $items = @()
 foreach ($sub in $subs)
 {
     Set-AzureRmContext -SubscriptionObject $sub
+    $tenant = Get-AzureADTenantDetail
     $account = Get-AzureRmRoleAssignment -IncludeClassicAdministrators | Where-Object RoleDefinitionName -eq 'ServiceAdministrator;AccountAdministrator'
+    try {
+        $user = Get-AzureADUser -ObjectId $account.SignInName
+    } catch {
+        $user = New-Object -TypeName psobject 
+        $user | Add-Member -MemberType NoteProperty -Name UserType -Value $_.Exception.Message
+    }
+
     $item = New-Object -TypeName psobject 
     $item | Add-Member -MemberType NoteProperty -Name TenantId -Value $sub.TenantId
+    $item | Add-Member -MemberType NoteProperty -Name TenantDomain -Value $tenant.VerifiedDomains.Name
     $item | Add-Member -MemberType NoteProperty -Name SubscriptionId -Value $sub.Id
     $item | Add-Member -MemberType NoteProperty -Name SubscriptionName -Value $sub.Name   
     $item | Add-Member -MemberType NoteProperty -Name Account -Value $account.SignInName
+    $item | Add-Member -MemberType NoteProperty -Name UserType -Value $user.UserType
+
     $items += ,$item
 }
 
