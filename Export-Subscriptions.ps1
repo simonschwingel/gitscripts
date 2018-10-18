@@ -70,17 +70,19 @@ foreach ($sub in $subs)
         $user = Get-AzureADUser -ObjectId $account.SignInName
     } catch {
         $user = New-Object -TypeName psobject 
-        $user | Add-Member -MemberType NoteProperty -Name UserType -Value $_.Exception.Message
+        $tmp = $_.Exception.Message -replace "`n|`r"," -- "
+        $user | Add-Member -MemberType NoteProperty -Name UserType -Value $tmp
     }
 
     $item = New-Object -TypeName psobject 
     $item | Add-Member -MemberType NoteProperty -Name TenantId -Value $sub.TenantId
-    $item | Add-Member -MemberType NoteProperty -Name TenantName -Value $tenant.DisplayName
+    $item | Add-Member -MemberType NoteProperty -Name TenantURL -Value $($tenant.VerifiedDomains | Where-Object Initial -eq $true).Name
     $item | Add-Member -MemberType NoteProperty -Name SubscriptionId -Value $sub.Id
     $item | Add-Member -MemberType NoteProperty -Name SubscriptionName -Value $sub.Name   
     $item | Add-Member -MemberType NoteProperty -Name Account -Value $account.SignInName
     $item | Add-Member -MemberType NoteProperty -Name UserType -Value $user.UserType
-
+    $item | Add-Member -MemberType NoteProperty -Name TenantVerifiedDomains -Value $($($tenant.VerifiedDomains | Select-Object -ExpandProperty Name) -join ";")
+    
     $items += ,$item
 }
 
